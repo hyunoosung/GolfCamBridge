@@ -78,6 +78,31 @@ To work on the app in Visual Studio, open `GolfCamBridge.slnx` (C# app only — 
 bridge for it. Run `DirectShowUnRegister_v140_x64.bat` (in the same Spinnaker folder as `DirectShowRegister...bat`)
 as administrator.
 
+## Installer
+
+For a PC that only runs GolfCamBridge (e.g. the simulator PC), build a setup program instead of installing the
+developer tools there:
+
+```powershell
+.\build-softcam.ps1                      # once, if bin\ is empty
+.\build-installer.ps1 -Version 0.1.0     # needs Inno Setup 6 (winget install JRSoftware.InnoSetup)
+# -> build\installer\GolfCamBridge-Setup-0.1.0.exe
+```
+
+The setup program:
+
+- checks for .NET Framework 4.8+, **Spinnaker SDK 4.4.0.246** (the exe is bound to exactly this `SpinnakerNET_v140`
+  version) and the Visual C++ x64 runtime 14.50+ (the softcam DLLs are built with v145), and stops with a download
+  hint if one is missing;
+- installs to `C:\Program Files\GolfCamBridge\app` and `\bin`, registers Golf Cam 1/2, and copies
+  `SpinnakerNET_v140.dll` from the PC's own Spinnaker install (it is not redistributed);
+- keeps an existing `golfcam.json` on upgrade and makes it writable for users (Settings → Save);
+- adds a Start menu shortcut and, optionally, "Start with Windows";
+- on uninstall, unregisters the virtual cameras **before** deleting the DLLs, so no ghost devices remain.
+
+Installing on a development PC re-points the Golf Cam registration to `Program Files`; after uninstalling, run
+`register-cams.ps1` again for the repo build.
+
 ## Configuration
 
 1. Start the app and use the tray menu **Show connected cameras** to see each camera's serial number
