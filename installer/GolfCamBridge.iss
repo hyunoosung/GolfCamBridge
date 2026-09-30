@@ -5,7 +5,7 @@
 ;   {app}\bin\softcam_golfcam1.dll, softcam_golfcam2.dll   (registered as "Golf Cam 1" / "Golf Cam 2")
 ;
 ; Uninstall unregisters the virtual cameras BEFORE deleting the DLLs (regserver flag), so no ghost
-; "Golf Cam" devices are left behind.
+; "Golf Cam" devices are left behind. Only {app}\app\golfcam.json (the user's settings) stays.
 
 #ifndef AppVersion
   #define AppVersion "0.0.0"
@@ -48,8 +48,9 @@ Name: autostart; Description: "Start GolfCamBridge when I sign in to Windows"
 [Files]
 Source: "..\app\GolfCamBridge.exe";        DestDir: "{app}\app"; Flags: ignoreversion
 Source: "..\app\GolfCamBridge.exe.config"; DestDir: "{app}\app"; Flags: ignoreversion
-; Settings: keep the user's file on upgrade; writable by users so Settings > Save and the tray toggles work.
-Source: "..\GolfCamBridge\golfcam.json";   DestDir: "{app}\app"; Flags: onlyifdoesntexist; Permissions: users-modify
+; Settings: never overwritten on upgrade, left in place on uninstall (a reinstall picks them up again);
+; writable by users so Settings > Save and the tray toggles work.
+Source: "..\GolfCamBridge\golfcam.json";   DestDir: "{app}\app"; Flags: onlyifdoesntexist uninsneveruninstall; Permissions: users-modify
 ; Not redistributed: copied from this PC's Spinnaker SDK so it always matches the installed SDK.
 Source: "{code:SpinnakerBin}\SpinnakerNET_v140.dll"; DestDir: "{app}\app"; Flags: external ignoreversion
 ; Virtual cameras. restartreplace: Premier/Chrome/Slack may have them loaded during an upgrade.

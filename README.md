@@ -96,7 +96,8 @@ The setup program:
   hint if one is missing;
 - installs to `C:\Program Files\GolfCamBridge\app` and `\bin`, registers Golf Cam 1/2, and copies
   `SpinnakerNET_v140.dll` from the PC's own Spinnaker install (it is not redistributed);
-- keeps an existing `golfcam.json` on upgrade and makes it writable for users (Settings → Save);
+- keeps `golfcam.json` on upgrade **and on uninstall** (a reinstall picks the settings up again; delete
+  `C:\Program Files\GolfCamBridge` by hand to reset them) and makes it writable for users (Settings → Save);
 - adds a Start menu shortcut and, optionally, "Start with Windows";
 - on uninstall, unregisters the virtual cameras **before** deleting the DLLs, so no ghost devices remain.
 
