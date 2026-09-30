@@ -1,0 +1,640 @@
+diff --git a/src/softcam/softcam.cpp b/src/softcam/softcam.cpp
+index 8cea836..f862ee5 100644
+--- a/src/softcam/softcam.cpp
++++ b/src/softcam/softcam.cpp
+@@ -5,18 +5,17 @@
+ 
+ #include <softcamcore/DShowSoftcam.h>
+ #include <softcamcore/SenderAPI.h>
++#include <softcamcore/Variant.h>
+ 
+ 
+-// {AEF3B972-5FA5-4647-9571-358EB472BC9E}
+-DEFINE_GUID(CLSID_DShowSoftcam,
+-0xaef3b972, 0x5fa5, 0x4647, 0x95, 0x71, 0x35, 0x8e, 0xb4, 0x72, 0xbc, 0x9e);
++SOFTCAM_DEFINE_CLSID(CLSID_DShowSoftcam);
+ 
+ 
+ namespace {
+ 
+ // Setup data
+ 
+-const wchar_t FILTER_NAME[] = L"DirectShow Softcam";
++const wchar_t FILTER_NAME[] = SOFTCAM_NAME_W;
+ const GUID &FILTER_CLASSID = CLSID_DShowSoftcam;
+ 
+ const AMOVIESETUP_MEDIATYPE s_pin_types[] =
+diff --git a/src/softcam/softcam.vcxproj b/src/softcam/softcam.vcxproj
+index e40d9ab..cdc2bcc 100644
+--- a/src/softcam/softcam.vcxproj
++++ b/src/softcam/softcam.vcxproj
+@@ -19,6 +19,8 @@
+     </ProjectConfiguration>
+   </ItemGroup>
+   <PropertyGroup Label="Globals">
++    <SoftcamVariant Condition="'$(SoftcamVariant)'==''">0</SoftcamVariant>
++    <SoftcamLog Condition="'$(SoftcamLog)'==''">0</SoftcamLog>
+     <VCProjectVersion>16.0</VCProjectVersion>
+     <Keyword>Win32Proj</Keyword>
+     <ProjectGuid>{52968d29-aa5f-41a4-bf1e-4c50f1098373}</ProjectGuid>
+@@ -84,7 +86,7 @@
+     <ClCompile>
+       <WarningLevel>Level4</WarningLevel>
+       <SDLCheck>true</SDLCheck>
+-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
++      <PreprocessorDefinitions>SOFTCAM_VARIANT=$(SoftcamVariant);SOFTCAM_ENABLE_LOG=$(SoftcamLog);WIN32;_CRT_SECURE_NO_WARNINGS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+       <AdditionalIncludeDirectories>.;..;..\baseclasses;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+@@ -121,7 +123,7 @@
+     <ClCompile>
+       <WarningLevel>Level4</WarningLevel>
+       <SDLCheck>true</SDLCheck>
+-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
++      <PreprocessorDefinitions>SOFTCAM_VARIANT=$(SoftcamVariant);SOFTCAM_ENABLE_LOG=$(SoftcamLog);WIN32;_CRT_SECURE_NO_WARNINGS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+       <AdditionalIncludeDirectories>.;..;..\baseclasses;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+@@ -159,7 +161,7 @@
+       <WarningLevel>Level4</WarningLevel>
+       <FunctionLevelLinking>true</FunctionLevelLinking>
+       <SDLCheck>true</SDLCheck>
+-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
++      <PreprocessorDefinitions>SOFTCAM_VARIANT=$(SoftcamVariant);SOFTCAM_ENABLE_LOG=$(SoftcamLog);WIN32;_CRT_SECURE_NO_WARNINGS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+       <AdditionalIncludeDirectories>.;..;..\baseclasses;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+       <ConformanceMode>true</ConformanceMode>
+@@ -197,7 +199,7 @@
+       <WarningLevel>Level4</WarningLevel>
+       <FunctionLevelLinking>true</FunctionLevelLinking>
+       <SDLCheck>true</SDLCheck>
+-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
++      <PreprocessorDefinitions>SOFTCAM_VARIANT=$(SoftcamVariant);SOFTCAM_ENABLE_LOG=$(SoftcamLog);WIN32;_CRT_SECURE_NO_WARNINGS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+       <AdditionalIncludeDirectories>.;..;..\baseclasses;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+       <ConformanceMode>true</ConformanceMode>
+diff --git a/src/softcamcore/DShowSoftcam.cpp b/src/softcamcore/DShowSoftcam.cpp
+index 024d978..4cad826 100644
+--- a/src/softcamcore/DShowSoftcam.cpp
++++ b/src/softcamcore/DShowSoftcam.cpp
+@@ -1,6 +1,8 @@
+ #include "DShowSoftcam.h"
++#include "Variant.h"
+ 
+ #include <cstring>
++#include <cstdlib>
+ #include <string>
+ #include <algorithm>
+ #include <cstdio>
+@@ -11,8 +13,12 @@
+ 
+ namespace {
+ 
+-//#define ENABLE_LOG
+-//#define LOG_FILE_PATH "C:\\my_temp\\debug_log.txt"
++// Build with /p:SoftcamLog=1 to log every DirectShow call made by the host app
++// (e.g. Foresight Premier) to C:\Users\Public\<camera name>.log
++#if defined(SOFTCAM_ENABLE_LOG) && SOFTCAM_ENABLE_LOG
++#define ENABLE_LOG
++#define LOG_FILE_PATH "C:\\Users\\Public\\" SOFTCAM_NAME_A ".log"
++#endif
+ 
+ #if defined(ENABLE_LOG)
+ 
+@@ -63,7 +69,7 @@ std::string IID_TO_STR(REFIID riid)
+     return s;
+ }
+ #define LOG(fmt, ...) [&,funcname=__func__]{ \
+-        if (logfile) std::fprintf(logfile, "%s: %s " fmt, NOW(), funcname, __VA_ARGS__); \
++        if (logfile) { std::fprintf(logfile, "%s: %s " fmt, NOW(), funcname, __VA_ARGS__); std::fflush(logfile); } \
+         std::printf("%s: %s " fmt, NOW(), funcname, __VA_ARGS__); \
+     }()
+ 
+@@ -95,13 +101,17 @@ AM_MEDIA_TYPE* allocateMediaType()
+     return amt;
+ }
+ 
+-std::size_t calcDIBSize(int width, int height)
++std::size_t calcDIBSize(int width, int height, int bit_count = 24)
+ {
+-    std::size_t stride = (static_cast<unsigned>(width) * 3 + 3) & ~3u;
++    std::size_t stride = (static_cast<unsigned>(width) * (unsigned)(bit_count / 8) + 3) & ~3u;
+     return stride * static_cast<unsigned>(height);
+ }
+ 
+-void fillMediaType(AM_MEDIA_TYPE* amt, int width, int height, float framerate)
++// Advertised frame-interval range (100ns units): 1000 fps .. 1 fps, like hardware drivers do.
++constexpr LONGLONG MIN_FRAME_INTERVAL = 10 * 1000;
++constexpr LONGLONG MAX_FRAME_INTERVAL = 10 * 1000 * 1000;
++
++void fillMediaType(AM_MEDIA_TYPE* amt, int width, int height, float framerate, int bit_count = 32)
+ {
+     BYTE *pbFormat = amt->pbFormat;
+ 
+@@ -109,7 +119,7 @@ void fillMediaType(AM_MEDIA_TYPE* amt, int width, int height, float framerate)
+     {
+         framerate = 60.0f;
+     }
+-    const float bit_rate = (float)width * (float)height * 24 * framerate;
++    const float bit_rate = (float)width * (float)height * (float)bit_count * framerate;
+     const float period = 10 * 1000 * 1000 / framerate;
+ 
+     VIDEOINFOHEADER* pFormat = (VIDEOINFOHEADER*)pbFormat;
+@@ -121,29 +131,29 @@ void fillMediaType(AM_MEDIA_TYPE* amt, int width, int height, float framerate)
+     pFormat->bmiHeader.biWidth = width;
+     pFormat->bmiHeader.biHeight = height;
+     pFormat->bmiHeader.biPlanes = 1;
+-    pFormat->bmiHeader.biBitCount = 24;
++    pFormat->bmiHeader.biBitCount = (WORD)bit_count;
+     pFormat->bmiHeader.biCompression = BI_RGB;
+-    pFormat->bmiHeader.biSizeImage = static_cast<uint32_t>(calcDIBSize(width, height));
++    pFormat->bmiHeader.biSizeImage = static_cast<uint32_t>(calcDIBSize(width, height, bit_count));
+ 
+     amt->majortype = MEDIATYPE_Video;
+-    amt->subtype = MEDIASUBTYPE_RGB24;
++    amt->subtype = bit_count == 32 ? MEDIASUBTYPE_RGB32 : MEDIASUBTYPE_RGB24;
+     amt->bFixedSizeSamples = TRUE;
+     amt->bTemporalCompression = FALSE;
+-    amt->lSampleSize = static_cast<uint32_t>(calcDIBSize(width, height));
++    amt->lSampleSize = static_cast<uint32_t>(calcDIBSize(width, height, bit_count));
+     amt->formattype = FORMAT_VideoInfo;
+     amt->pUnk = nullptr;
+     amt->cbFormat = sizeof(VIDEOINFOHEADER);
+     amt->pbFormat = pbFormat;
+ }
+ 
+-AM_MEDIA_TYPE* makeMediaType(int width, int height, float framerate)
++AM_MEDIA_TYPE* makeMediaType(int width, int height, float framerate, int bit_count = 32)
+ {
+     AM_MEDIA_TYPE *amt = allocateMediaType();
+     if (!amt)
+     {
+         return nullptr;
+     }
+-    fillMediaType(amt, width, height, framerate);
++    fillMediaType(amt, width, height, framerate, bit_count);
+     return amt;
+ }
+ 
+@@ -207,29 +217,48 @@ Softcam::SetFormat(AM_MEDIA_TYPE *mt)
+         LOG("-> E_FAIL\n");
+         return E_FAIL;
+     }
++    if (mt->formattype == FORMAT_VideoInfo && mt->pbFormat)
++    {
++        VIDEOINFOHEADER* req = (VIDEOINFOHEADER*)mt->pbFormat;
++        LOG("requested subtype=%s %ldx%ld bits=%d compression=0x%08lX interval=%lld\n",
++            IID_TO_STR(mt->subtype).c_str(), req->bmiHeader.biWidth, req->bmiHeader.biHeight,
++            (int)req->bmiHeader.biBitCount, (unsigned long)req->bmiHeader.biCompression,
++            (long long)req->AvgTimePerFrame);
++        (void)req;
++    }
++    else
++    {
++        LOG("requested subtype=%s formattype=%s\n",
++            IID_TO_STR(mt->subtype).c_str(), IID_TO_STR(mt->formattype).c_str());
++    }
+     if (mt->majortype != MEDIATYPE_Video ||
+-        mt->subtype != MEDIASUBTYPE_RGB24)
++        (mt->subtype != MEDIASUBTYPE_RGB24 && mt->subtype != MEDIASUBTYPE_RGB32))
+     {
+         LOG("-> E_FAIL (invalid media type)\n");
+         return E_FAIL;
+     }
++    const int bits = mt->subtype == MEDIASUBTYPE_RGB32 ? 32 : 24;
+     if (mt->formattype == FORMAT_VideoInfo && mt->pbFormat)
+     {
+         VIDEOINFOHEADER* pFormat = (VIDEOINFOHEADER*)mt->pbFormat;
+         if (pFormat->bmiHeader.biWidth != m_width ||
+-            pFormat->bmiHeader.biHeight != m_height)
++            std::abs(pFormat->bmiHeader.biHeight) != m_height)
+         {
+             LOG("-> E_FAIL (invalid dimension)\n");
+             return E_FAIL;
+         }
+-        if (pFormat->bmiHeader.biBitCount != 24 ||
++        if (pFormat->bmiHeader.biBitCount != bits ||
+             pFormat->bmiHeader.biCompression != BI_RGB)
+         {
+             LOG("-> E_FAIL (invalid color format)\n");
+             return E_FAIL;
+         }
+     }
+-    LOG("-> S_OK\n");
++    {
++        CAutoLock lock(&m_critsec);
++        m_bit_count = bits;
++    }
++    LOG("-> S_OK (%d bit)\n", bits);
+     return S_OK;
+ }
+ 
+@@ -246,7 +275,7 @@ Softcam::GetFormat(AM_MEDIA_TYPE **out_pmt)
+         LOG("-> E_FAIL\n");
+         return E_FAIL;
+     }
+-    AM_MEDIA_TYPE* mt = makeMediaType(m_width, m_height, m_framerate);
++    AM_MEDIA_TYPE* mt = makeMediaType(m_width, m_height, m_framerate, bitCount());
+     if (!mt)
+     {
+         LOG("-> E_OUTOFMEMORY\n");
+@@ -270,7 +299,7 @@ Softcam::GetNumberOfCapabilities(int *out_count, int *out_size)
+         LOG("-> E_FAIL\n");
+         return E_FAIL;
+     }
+-    *out_count = 1;
++    *out_count = 2;     // 0: RGB32, 1: RGB24
+     *out_size = sizeof(VIDEO_STREAM_CONFIG_CAPS);
+     LOG("-> S_OK\n");
+     return S_OK;
+@@ -289,12 +318,12 @@ Softcam::GetStreamCaps(int index, AM_MEDIA_TYPE **out_pmt, BYTE *out_scc)
+         LOG("-> E_FAIL\n");
+         return E_FAIL;
+     }
+-    if (index >= 1)
++    if (index < 0 || index >= 2)
+     {
+-        LOG("-> S_FALSE (invalid index)\n");
++        LOG("-> S_FALSE (invalid index %d)\n", index);
+         return S_FALSE;
+     }
+-    AM_MEDIA_TYPE *mt = makeMediaType(m_width, m_height, m_framerate);
++    AM_MEDIA_TYPE *mt = makeMediaType(m_width, m_height, m_framerate, index == 0 ? 32 : 24);
+     if (!mt)
+     {
+         LOG("-> E_OUTOFMEMORY\n");
+@@ -320,11 +349,12 @@ Softcam::GetStreamCaps(int index, AM_MEDIA_TYPE **out_pmt, BYTE *out_scc)
+     scc->StretchTapsY = 0;
+     scc->ShrinkTapsX = 0;
+     scc->ShrinkTapsY = 0;
+-    scc->MinFrameInterval = format->AvgTimePerFrame;
+-    scc->MaxFrameInterval = format->AvgTimePerFrame;
+-    scc->MinBitsPerSecond = (LONG)format->dwBitRate;
+-    scc->MaxBitsPerSecond = (LONG)format->dwBitRate;
+-    LOG("-> S_OK\n");
++    scc->MinFrameInterval = (std::min)(MIN_FRAME_INTERVAL, format->AvgTimePerFrame);
++    scc->MaxFrameInterval = (std::max)(MAX_FRAME_INTERVAL, format->AvgTimePerFrame);
++    const double bits_per_frame = (double)m_width * m_height * (index == 0 ? 32 : 24);
++    scc->MinBitsPerSecond = (LONG)(std::min)(bits_per_frame * 1e7 / (double)scc->MaxFrameInterval, (double)LONG_MAX);
++    scc->MaxBitsPerSecond = (LONG)(std::min)(bits_per_frame * 1e7 / (double)scc->MinFrameInterval, (double)LONG_MAX);
++    LOG("-> S_OK (index %d)\n", index);
+     return S_OK;
+ }
+ 
+@@ -358,6 +388,13 @@ FrameBuffer* Softcam::getFrameBuffer()
+     }
+ }
+ 
++int
++Softcam::bitCount()
++{
++    CAutoLock lock(&m_critsec);
++    return m_bit_count;
++}
++
+ void
+ Softcam::releaseFrameBuffer()
+ {
+@@ -416,7 +453,10 @@ HRESULT SoftcamStream::FillBuffer(IMediaSample *pms)
+         if (auto fb = getParent()->getFrameBuffer())
+         {
+             bool active = fb->waitForNewFrame(m_frame_counter);
+-            fb->transferToDIB(pData, &m_frame_counter);
++            const VIDEOINFOHEADER* vih = (const VIDEOINFOHEADER*)m_mt.Format();
++            const int bits = vih ? vih->bmiHeader.biBitCount : 24;
++            const bool top_down = vih && vih->bmiHeader.biHeight < 0;
++            fb->transferToDIB(pData, &m_frame_counter, bits, top_down);
+ 
+             if (!active)
+             {
+@@ -425,10 +465,11 @@ HRESULT SoftcamStream::FillBuffer(IMediaSample *pms)
+                 getParent()->releaseFrameBuffer();
+ 
+                 // Save the last image for a placeholder.
+-                const std::size_t size = calcDIBSize(m_width, m_height);
+-                if (!m_screenshot)
++                const std::size_t size = (std::size_t)lDataLen;
++                if (!m_screenshot || m_screenshot_size != size)
+                 {
+                     m_screenshot.reset(new uint8_t[size]);
++                    m_screenshot_size = size;
+                 }
+                 {
+                     // Darken the image to indicate that the source is inactive.
+@@ -446,8 +487,10 @@ HRESULT SoftcamStream::FillBuffer(IMediaSample *pms)
+             m_frame_counter = 0;
+             Timer::sleep(0.100f);
+ 
+-            const std::size_t size = calcDIBSize(m_width, m_height);
+-            std::memcpy(pData, m_screenshot.get(), size);
++            if (m_screenshot)
++            {
++                std::memcpy(pData, m_screenshot.get(), (std::min)(m_screenshot_size, (std::size_t)lDataLen));
++            }
+         }
+ 
+         CAutoLock lock(&m_critsec);
+@@ -474,7 +517,7 @@ STDMETHODIMP SoftcamStream::Notify(IBaseFilter * pSender, Quality q)
+ }
+ 
+ 
+-HRESULT SoftcamStream::GetMediaType(CMediaType *pmt)
++HRESULT SoftcamStream::GetMediaType(int iPosition, CMediaType *pmt)
+ {
+     CheckPointer(pmt,E_POINTER);
+ 
+@@ -483,6 +526,14 @@ HRESULT SoftcamStream::GetMediaType(CMediaType *pmt)
+         LOG("-> E_FAIL\n");
+         return E_FAIL;
+     }
++    if (iPosition < 0)
++    {
++        return E_INVALIDARG;
++    }
++    if (iPosition >= 2)
++    {
++        return VFW_S_NO_MORE_ITEMS;
++    }
+ 
+     VIDEOINFOHEADER *pvi = (VIDEOINFOHEADER*)pmt->AllocFormatBuffer(sizeof(VIDEOINFOHEADER));
+     if (pvi == nullptr)
+@@ -491,12 +542,46 @@ HRESULT SoftcamStream::GetMediaType(CMediaType *pmt)
+         return E_OUTOFMEMORY;
+     }
+ 
+-    fillMediaType(pmt, getParent()->width(), getParent()->height(), getParent()->framerate());
++    // Position 0 is the format selected via IAMStreamConfig::SetFormat (RGB32 by default).
++    const int preferred = getParent()->bitCount();
++    const int bits = iPosition == 0 ? preferred : (preferred == 32 ? 24 : 32);
++    fillMediaType(pmt, getParent()->width(), getParent()->height(), getParent()->framerate(), bits);
+ 
+-    LOG("-> NOERROR\n");
++    LOG("-> NOERROR (position %d, %d bit)\n", iPosition, bits);
+     return NOERROR;
+ }
+ 
++HRESULT SoftcamStream::CheckMediaType(const CMediaType *pmt)
++{
++    CheckPointer(pmt,E_POINTER);
++    if (!m_valid)
++    {
++        return E_FAIL;
++    }
++    if (*pmt->Type() != MEDIATYPE_Video ||
++        (*pmt->Subtype() != MEDIASUBTYPE_RGB32 && *pmt->Subtype() != MEDIASUBTYPE_RGB24) ||
++        *pmt->FormatType() != FORMAT_VideoInfo ||
++        pmt->FormatLength() < sizeof(VIDEOINFOHEADER))
++    {
++        LOG("-> E_FAIL (type %s)\n", IID_TO_STR(*pmt->Subtype()).c_str());
++        return E_FAIL;
++    }
++    const VIDEOINFOHEADER* vih = (const VIDEOINFOHEADER*)pmt->Format();
++    const int bits = *pmt->Subtype() == MEDIASUBTYPE_RGB32 ? 32 : 24;
++    if (vih->bmiHeader.biWidth != m_width ||
++        std::abs(vih->bmiHeader.biHeight) != m_height ||
++        vih->bmiHeader.biBitCount != bits ||
++        vih->bmiHeader.biCompression != BI_RGB)
++    {
++        LOG("-> E_FAIL (%ldx%ld %d bit)\n", vih->bmiHeader.biWidth, vih->bmiHeader.biHeight,
++            (int)vih->bmiHeader.biBitCount);
++        return E_FAIL;
++    }
++    LOG("-> S_OK (%ldx%ld %d bit)\n", vih->bmiHeader.biWidth, vih->bmiHeader.biHeight, bits);
++    return S_OK;
++}
++
++
+ HRESULT SoftcamStream::DecideBufferSize(IMemAllocator *pAlloc,
+                                         ALLOCATOR_PROPERTIES *pProperties)
+ {
+@@ -508,7 +593,9 @@ HRESULT SoftcamStream::DecideBufferSize(IMemAllocator *pAlloc,
+ 
+     VIDEOINFO *pvi = (VIDEOINFO *)m_mt.Format();
+     pProperties->cBuffers = 1;
+-    pProperties->cbBuffer = (long)pvi->bmiHeader.biSizeImage;
++    // Some hosts propose a type with biSizeImage = 0, so compute the size ourselves as well.
++    const std::size_t computed = calcDIBSize(m_width, m_height, pvi->bmiHeader.biBitCount == 32 ? 32 : 24);
++    pProperties->cbBuffer = (long)(std::max)((std::size_t)pvi->bmiHeader.biSizeImage, computed);
+ 
+     ALLOCATOR_PROPERTIES actual;
+     hr = pAlloc->SetProperties(pProperties, &actual);
+diff --git a/src/softcamcore/DShowSoftcam.h b/src/softcamcore/DShowSoftcam.h
+index fcecf93..5a03c82 100644
+--- a/src/softcamcore/DShowSoftcam.h
++++ b/src/softcamcore/DShowSoftcam.h
+@@ -31,6 +31,7 @@ public:
+     int             width() const { return m_width; }
+     int             height() const { return m_height; }
+     float           framerate() const { return m_framerate; }
++    int             bitCount();                 // 32 (RGB32) or 24 (RGB24), chosen via SetFormat
+     void            releaseFrameBuffer();
+ 
+ private:
+@@ -40,6 +41,7 @@ private:
+     const int   m_width;
+     const int   m_height;
+     const float m_framerate;
++    int         m_bit_count = 32;
+ 
+     Softcam(LPUNKNOWN lpunk, const GUID& clsid, HRESULT *phr);
+ };
+@@ -65,7 +67,8 @@ class SoftcamStream : public CSourceStream, public IKsPropertySet, public IAMStr
+ 
+     // CSourceStream
+     HRESULT FillBuffer(IMediaSample *pms) override;
+-    HRESULT GetMediaType(CMediaType *pMediaType) override;
++    HRESULT GetMediaType(int iPosition, CMediaType *pMediaType) override;
++    HRESULT CheckMediaType(const CMediaType *pMediaType) override;
+     HRESULT OnThreadCreate(void) override;
+ 
+     //  IKsPropertySet
+@@ -90,6 +93,7 @@ private:
+     const int   m_height;
+     uint64_t    m_frame_counter = 0;
+     std::unique_ptr<uint8_t[]>  m_screenshot;
++    std::size_t m_screenshot_size = 0;
+ 
+     CCritSec m_critsec;
+     CRefTime m_sample_time;
+diff --git a/src/softcamcore/FrameBuffer.cpp b/src/softcamcore/FrameBuffer.cpp
+index ac6cd04..6cf8cf6 100644
+--- a/src/softcamcore/FrameBuffer.cpp
++++ b/src/softcamcore/FrameBuffer.cpp
+@@ -1,14 +1,16 @@
+ #include "FrameBuffer.h"
++#include "Variant.h"
+ 
+ #include <windows.h>
+ #include <mutex> // lock_guard
++#include <cstring>
+ 
+ 
+ namespace softcam {
+ 
+ 
+-const char NamedMutexName[] = "DirectShow Softcam/NamedMutex";
+-const char SharedMemoryName[] = "DirectShow Softcam/SharedMemory";
++const char NamedMutexName[] = SOFTCAM_NAME_A "/NamedMutex";
++const char SharedMemoryName[] = SOFTCAM_NAME_A "/SharedMemory";
+ const uint8_t ProtocolVersion = 2;
+ 
+ 
+@@ -234,7 +236,11 @@ void FrameBuffer::write(const void* image_bits)
+     frame->m_frame_counter += 1;
+ }
+ 
+-void FrameBuffer::transferToDIB(void* image_bits, uint64_t* out_frame_counter)
++void FrameBuffer::transferToDIB(
++                        void*       image_bits,
++                        uint64_t*   out_frame_counter,
++                        int         bit_count,
++                        bool        top_down)
+ {
+     if (!m_shmem)
+     {
+@@ -247,14 +253,35 @@ void FrameBuffer::transferToDIB(void* image_bits, uint64_t* out_frame_counter)
+     {
+         int w = frame->m_width;
+         int h = frame->m_height;
+-        int gap = ((w * 3 + 3) & ~3) - w * 3;
+-        const std::uint8_t* image = frame->imageData();
++        const std::uint8_t* image = frame->imageData();   // top-down BGR24
+         std::uint8_t* dest = (std::uint8_t*)image_bits;
+-        for (int y = 0; y < h; y++)
++        if (bit_count == 32)
+         {
+-            const std::uint8_t* src = image + 3 * w * (h - 1 - y);
+-            std::memcpy(dest, src, 3 * (uint32_t)w);
+-            dest += 3 * w + gap;
++            // BGRX, stride = 4 * w (always DWORD aligned)
++            for (int y = 0; y < h; y++)
++            {
++                const std::uint8_t* src = image + 3 * w * (top_down ? y : (h - 1 - y));
++                std::uint8_t* d = dest + (std::size_t)4 * w * y;
++                for (int x = 0; x < w; x++)
++                {
++                    d[0] = src[0];
++                    d[1] = src[1];
++                    d[2] = src[2];
++                    d[3] = 0xFF;
++                    src += 3;
++                    d += 4;
++                }
++            }
++        }
++        else
++        {
++            int gap = ((w * 3 + 3) & ~3) - w * 3;
++            for (int y = 0; y < h; y++)
++            {
++                const std::uint8_t* src = image + 3 * w * (top_down ? y : (h - 1 - y));
++                std::memcpy(dest, src, 3 * (uint32_t)w);
++                dest += 3 * w + gap;
++            }
+         }
+         *out_frame_counter = frame->m_frame_counter;
+     }
+diff --git a/src/softcamcore/FrameBuffer.h b/src/softcamcore/FrameBuffer.h
+index 850ec1b..f253a71 100644
+--- a/src/softcamcore/FrameBuffer.h
++++ b/src/softcamcore/FrameBuffer.h
+@@ -37,7 +37,8 @@ class FrameBuffer
+ 
+     void            deactivate();
+     void            write(const void* image_bits);
+-    void            transferToDIB(void* image_bits, uint64_t* out_frame_counter);
++    void            transferToDIB(void* image_bits, uint64_t* out_frame_counter,
++                                  int bit_count = 24, bool top_down = false);
+     bool            waitForNewFrame(uint64_t frame_counter, float time_out = 0.5f);
+ 
+     void            release();
+diff --git a/src/softcamcore/Variant.h b/src/softcamcore/Variant.h
+new file mode 100644
+index 0000000..c95c207
+--- /dev/null
++++ b/src/softcamcore/Variant.h
+@@ -0,0 +1,27 @@
++#pragma once
++
++// Build-time selection of the virtual camera identity.
++// Build with /DSOFTCAM_VARIANT=1 or /DSOFTCAM_VARIANT=2 (e.g. `set CL=/DSOFTCAM_VARIANT=1`)
++// so that two independent virtual webcams can coexist on one system.
++// Each variant has its own CLSID, device name, mutex and shared memory.
++
++#ifndef SOFTCAM_VARIANT
++#define SOFTCAM_VARIANT 0
++#endif
++
++#if SOFTCAM_VARIANT == 1
++  // {10F87A76-EC04-4014-8038-A94D5821E192}
++  #define SOFTCAM_DEFINE_CLSID(name) DEFINE_GUID(name, 0x10f87a76, 0xec04, 0x4014, 0x80, 0x38, 0xa9, 0x4d, 0x58, 0x21, 0xe1, 0x92)
++  #define SOFTCAM_NAME_A "Golf Cam 1"
++  #define SOFTCAM_NAME_W L"Golf Cam 1"
++#elif SOFTCAM_VARIANT == 2
++  // {8CC08C60-EDDD-4522-87D2-BE41E5125E3E}
++  #define SOFTCAM_DEFINE_CLSID(name) DEFINE_GUID(name, 0x8cc08c60, 0xeddd, 0x4522, 0x87, 0xd2, 0xbe, 0x41, 0xe5, 0x12, 0x5e, 0x3e)
++  #define SOFTCAM_NAME_A "Golf Cam 2"
++  #define SOFTCAM_NAME_W L"Golf Cam 2"
++#else
++  // Original softcam identity {AEF3B972-5FA5-4647-9571-358EB472BC9E}
++  #define SOFTCAM_DEFINE_CLSID(name) DEFINE_GUID(name, 0xaef3b972, 0x5fa5, 0x4647, 0x95, 0x71, 0x35, 0x8e, 0xb4, 0x72, 0xbc, 0x9e)
++  #define SOFTCAM_NAME_A "DirectShow Softcam"
++  #define SOFTCAM_NAME_W L"DirectShow Softcam"
++#endif
+diff --git a/src/softcamcore/softcamcore.vcxproj b/src/softcamcore/softcamcore.vcxproj
+index babc0b7..25b695d 100644
+--- a/src/softcamcore/softcamcore.vcxproj
++++ b/src/softcamcore/softcamcore.vcxproj
+@@ -19,6 +19,8 @@
+     </ProjectConfiguration>
+   </ItemGroup>
+   <PropertyGroup Label="Globals">
++    <SoftcamVariant Condition="'$(SoftcamVariant)'==''">0</SoftcamVariant>
++    <SoftcamLog Condition="'$(SoftcamLog)'==''">0</SoftcamLog>
+     <VCProjectVersion>16.0</VCProjectVersion>
+     <Keyword>Win32Proj</Keyword>
+     <ProjectGuid>{df9d5a2d-3bed-4d1a-8484-22a654c9ad76}</ProjectGuid>
+@@ -90,7 +92,7 @@
+     <ClCompile>
+       <WarningLevel>Level4</WarningLevel>
+       <SDLCheck>true</SDLCheck>
+-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
++      <PreprocessorDefinitions>SOFTCAM_VARIANT=$(SoftcamVariant);SOFTCAM_ENABLE_LOG=$(SoftcamLog);WIN32;_CRT_SECURE_NO_WARNINGS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+       <AdditionalIncludeDirectories>.;..;..\baseclasses;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+       <Optimization>Disabled</Optimization>
+@@ -106,7 +108,7 @@
+     <ClCompile>
+       <WarningLevel>Level4</WarningLevel>
+       <SDLCheck>true</SDLCheck>
+-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
++      <PreprocessorDefinitions>SOFTCAM_VARIANT=$(SoftcamVariant);SOFTCAM_ENABLE_LOG=$(SoftcamLog);WIN32;_CRT_SECURE_NO_WARNINGS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+       <AdditionalIncludeDirectories>.;..;..\baseclasses;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+       <Optimization>Disabled</Optimization>
+@@ -123,7 +125,7 @@
+       <WarningLevel>Level4</WarningLevel>
+       <FunctionLevelLinking>true</FunctionLevelLinking>
+       <SDLCheck>true</SDLCheck>
+-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
++      <PreprocessorDefinitions>SOFTCAM_VARIANT=$(SoftcamVariant);SOFTCAM_ENABLE_LOG=$(SoftcamLog);WIN32;_CRT_SECURE_NO_WARNINGS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+       <AdditionalIncludeDirectories>.;..;..\baseclasses;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+       <ConformanceMode>true</ConformanceMode>
+@@ -140,7 +142,7 @@
+       <WarningLevel>Level4</WarningLevel>
+       <FunctionLevelLinking>true</FunctionLevelLinking>
+       <SDLCheck>true</SDLCheck>
+-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
++      <PreprocessorDefinitions>SOFTCAM_VARIANT=$(SoftcamVariant);SOFTCAM_ENABLE_LOG=$(SoftcamLog);WIN32;_CRT_SECURE_NO_WARNINGS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+       <AdditionalIncludeDirectories>.;..;..\baseclasses;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+       <ConformanceMode>true</ConformanceMode>
+@@ -155,6 +157,7 @@
+   <ItemGroup>
+     <ClInclude Include="DShowSoftcam.h" />
+     <ClInclude Include="FrameBuffer.h" />
++    <ClInclude Include="Variant.h" />
+     <ClInclude Include="Misc.h" />
+     <ClInclude Include="SenderAPI.h" />
+     <ClInclude Include="Watchdog.h" />

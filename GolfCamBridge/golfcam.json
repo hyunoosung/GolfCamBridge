@@ -1,0 +1,37 @@
+{
+  "SoftcamDir": "..\\bin",
+  "ColorAlgorithm": "HQ_LINEAR",
+  "Mode": "OnDemand",
+  "IdleReleaseSeconds": 60,
+  "StandbyFps": 10,
+  "Cameras": [
+    {
+      "Name": "FO",
+      "Serial": "25235675",
+      "Index": 0,
+      "VirtualCam": 1,
+      "FrameRate": 223,
+      "ExposureUs": 2000,
+      "GainDb": 24,
+      "PixelFormat": "BayerRG8",
+      "ReverseX": false,
+      "ReverseY": false,
+      "Width": 1280,
+      "Height": 720
+    },
+    {
+      "Name": "DTL",
+      "Serial": "26119442",
+      "Index": 1,
+      "VirtualCam": 2,
+      "FrameRate": 223,
+      "ExposureUs": 2000,
+      "GainDb": 24,
+      "PixelFormat": "BayerRG8",
+      "ReverseX": false,
+      "ReverseY": false,
+      "Width": 1280,
+      "Height": 720
+    }
+  ]
+}

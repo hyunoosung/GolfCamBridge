@@ -1,0 +1,14 @@
+# build output
+build/
+bin/
+app/
+obj/
+
+# Visual Studio / editors
+.vs/
+*.user
+*.suo
+.vscode/
+
+# local backups
+_orig-*/

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SpinnakerNET_v140 is a .NET Framework (C++/CLI) assembly, so this app targets net48. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>disable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- Build output goes to <repo>\app so it sits next to <repo>\bin (the softcam DLLs). -->
+    <OutputPath>..\app\</OutputPath>
+    <!-- Override with: dotnet build -p:SpinnakerBin="D:\...\bin64\vs2015" -->
+    <SpinnakerBin Condition="'$(SpinnakerBin)'==''">C:\Program Files\Teledyne\Spinnaker\bin64\vs2015</SpinnakerBin>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="SpinnakerNET_v140">
+      <HintPath>$(SpinnakerBin)\SpinnakerNET_v140.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+
+  <!-- Copy the default settings only if app\golfcam.json does not exist yet, so rebuilding never overwrites your settings. -->
+  <Target Name="CopyDefaultConfig" AfterTargets="Build" Condition="!Exists('$(OutDir)golfcam.json')">
+    <Copy SourceFiles="golfcam.json" DestinationFolder="$(OutDir)" />
+  </Target>
+
+</Project>
