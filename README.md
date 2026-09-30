@@ -230,5 +230,8 @@ If you enabled **Start with Windows**, turn it off in the tray menu first.
 
 ## License
 
-The softcam part is based on [tshino/softcam](https://github.com/tshino/softcam) (MIT License); see the upstream
-repository for its license text.
+[MIT](LICENSE).
+
+The virtual camera DLLs are built from a modified [tshino/softcam](https://github.com/tshino/softcam) (MIT), which
+includes Microsoft's DirectShow Base Classes (MIT). Their notices are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
+and are installed with the app. The Spinnaker SDK is not part of this project and is not redistributed.

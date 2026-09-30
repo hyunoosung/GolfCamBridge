@@ -57,6 +57,10 @@ Source: "{code:SpinnakerBin}\SpinnakerNET_v140.dll"; DestDir: "{app}\app"; Flags
 Source: "..\bin\softcam_golfcam1.dll"; DestDir: "{app}\bin"; Flags: ignoreversion regserver restartreplace uninsrestartdelete
 Source: "..\bin\softcam_golfcam2.dll"; DestDir: "{app}\bin"; Flags: ignoreversion regserver restartreplace uninsrestartdelete
 
+; MIT requires the notices to travel with the binaries.
+Source: "..\LICENSE";                 DestDir: "{app}"; DestName: "LICENSE.txt";                Flags: ignoreversion
+Source: "..\THIRD-PARTY-NOTICES.md";  DestDir: "{app}"; DestName: "THIRD-PARTY-NOTICES.txt";    Flags: ignoreversion
+
 [Icons]
 Name: "{autoprograms}\GolfCamBridge"; Filename: "{app}\app\GolfCamBridge.exe"
 
