@@ -16,8 +16,8 @@
       "PixelFormat": "BayerRG8",
       "ReverseX": false,
       "ReverseY": false,
-      "Width": 1280,
-      "Height": 720
+      "Width": 1440,
+      "Height": 1080
     },
     {
       "Name": "DTL",
@@ -30,8 +30,8 @@
       "PixelFormat": "BayerRG8",
       "ReverseX": false,
       "ReverseY": false,
-      "Width": 1280,
-      "Height": 720
+      "Width": 1440,
+      "Height": 1080
     }
   ]
 }

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <memory>
 #include "Misc.h"
 #include "Watchdog.h"
 
@@ -52,6 +53,7 @@ class FrameBuffer
 
     mutable NamedMutex      m_mutex;
     SharedMemory            m_shmem;
+    std::shared_ptr<void>   m_sender_token;   // sender only: named object that exists while a sender process lives
     Watchdog                m_sender_watchdog;
     Watchdog                m_receiver_watchdog;
 

@@ -120,8 +120,8 @@ namespace GolfCamBridge
             PixelFormat = "BayerRG8";
             ReverseX = false;
             ReverseY = false;
-            Width = 1280;
-            Height = 720;
+            Width = 1440;   // BFS-U3-16S2C full sensor (IMX273)
+            Height = 1080;
         }
     }
 }

@@ -11,6 +11,7 @@ namespace softcam {
 
 const char NamedMutexName[] = SOFTCAM_NAME_A "/NamedMutex";
 const char SharedMemoryName[] = SOFTCAM_NAME_A "/SharedMemory";
+const char SenderTokenName[] = SOFTCAM_NAME_A "/Sender";
 const uint8_t ProtocolVersion = 2;
 
 
@@ -53,8 +54,39 @@ FrameBuffer FrameBuffer::create(
         return fb;
     }
 
+    // Only one sender per camera. The token is a named object that only senders open; Windows closes it
+    // when the sender process ends, so its existence means "a sender is alive".
+    HANDLE token = CreateEventA(nullptr, TRUE, FALSE, SenderTokenName);
+    if (!token)
+    {
+        return fb;
+    }
+    if (GetLastError() == ERROR_ALREADY_EXISTS)
+    {
+        CloseHandle(token);
+        return fb;
+    }
+    fb.m_sender_token.reset(token, [](void* h) { CloseHandle(h); });
+
     auto shmem_size = calcMemorySize((uint16_t)width, (uint16_t)height);
     fb.m_shmem = SharedMemory::create(SharedMemoryName, shmem_size);
+    bool reused = false;
+    if (!fb.m_shmem)
+    {
+        // The name still exists: a host app (e.g. Premier) keeps the previous sender's memory open.
+        // No other sender is alive (we hold the token), so take the memory over if it is big enough.
+        // Without this, restarting the bridge while an app holds a Golf Cam fails until that app lets go.
+        fb.m_shmem = SharedMemory::open(SharedMemoryName);
+        if (fb.m_shmem && fb.m_shmem.size() < shmem_size)
+        {
+            fb.m_shmem = {};   // larger than before (ROI grew): the app has to release the camera first
+        }
+        reused = (bool)fb.m_shmem;
+    }
+    if (!fb.m_shmem)
+    {
+        fb.m_sender_token.reset();
+    }
     if (fb.m_shmem)
     {
         std::lock_guard<NamedMutex> lock(fb.m_mutex);
@@ -65,10 +97,14 @@ FrameBuffer FrameBuffer::create(
         frame->m_height = (uint16_t)height;
         frame->m_framerate = framerate;
         frame->m_is_active = 1;
-        frame->m_connected_min_version = 0;
-        frame->m_watchdog_sender_heartbeat = 0;
-        frame->m_watchdog_receiver_heartbeat = 0;
-        frame->m_frame_counter = 0;
+        if (!reused)
+        {
+            frame->m_connected_min_version = 0;
+            frame->m_watchdog_sender_heartbeat = 0;
+            frame->m_watchdog_receiver_heartbeat = 0;
+            frame->m_frame_counter = 0;
+        }
+        // reused: keep the receiver state and frame counter so attached receivers just continue
 
         auto mutex = fb.m_mutex;
         fb.m_sender_watchdog = Watchdog::createHeartbeat(
@@ -154,6 +190,7 @@ FrameBuffer::operator =(const FrameBuffer& fb)
     m_sender_watchdog = {};
     m_shmem = {};
     m_shmem = fb.m_shmem;
+    m_sender_token = fb.m_sender_token;
     m_sender_watchdog = fb.m_sender_watchdog;
     m_receiver_watchdog = fb.m_receiver_watchdog;
     return *this;
@@ -311,6 +348,7 @@ void FrameBuffer::release()
     m_receiver_watchdog.stop();
     m_sender_watchdog.stop();
     m_shmem = SharedMemory{};
+    m_sender_token.reset();
 }
 
 FrameBuffer::Header* FrameBuffer::header()

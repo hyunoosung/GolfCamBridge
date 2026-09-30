@@ -751,14 +751,14 @@ namespace GolfCamBridge
             var live = new GroupBox { Text = "Immediate — applied while streaming (no restart)", Location = new Point(10, 32), Size = new Size(400, 218) };
             page.Controls.Add(live);
             AddLabel(live, "Exposure (µs)", 10, 22, 200);
-            cp.ExpBar = new TrackBar { Location = new Point(6, 40), Size = new Size(260, 30), Minimum = 0, Maximum = 1000, TickStyle = TickStyle.None, SmallChange = 5, LargeChange = 50 };
+            cp.ExpBar = new TrackBar { AutoSize = false, Location = new Point(6, 40), Size = new Size(260, 30), Minimum = 0, Maximum = 1000, TickStyle = TickStyle.None, SmallChange = 5, LargeChange = 50 };
             live.Controls.Add(cp.ExpBar);
             cp.Exp = AddNud(live, 274, 42, 112, (decimal)DefExpMin, (decimal)DefExpMax, 0, 10);
             cp.ExpRange = AddLabel(live, "", 10, 72, 380);
             cp.ExpRange.ForeColor = SystemColors.GrayText;
 
             AddLabel(live, "Gain (dB)", 10, 96, 200);
-            cp.GainBar = new TrackBar { Location = new Point(6, 114), Size = new Size(260, 30), Minimum = 0, Maximum = 480, TickStyle = TickStyle.None, SmallChange = 1, LargeChange = 10 };
+            cp.GainBar = new TrackBar { AutoSize = false, Location = new Point(6, 114), Size = new Size(260, 30), Minimum = 0, Maximum = 480, TickStyle = TickStyle.None, SmallChange = 1, LargeChange = 10 };
             live.Controls.Add(cp.GainBar);
             cp.Gain = AddNud(live, 274, 116, 112, (decimal)DefGainMin, (decimal)DefGainMax, 1, 0.5m);
             cp.GainRange = AddLabel(live, "", 10, 146, 380);

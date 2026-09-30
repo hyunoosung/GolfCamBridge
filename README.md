@@ -30,6 +30,12 @@ and only one camera at a time. The bridge avoids all of that:
   The ADC on this model only goes up to 10 bit.
 - **Two cameras at full resolution exceed USB3 bandwidth.** With a 1280x720 ROI both run at 223 fps.
 - The bridge (the sender) must be running before an app opens a Golf Cam, otherwise softcam has no format to offer.
+- **Upstream softcam cannot restart its sender while an app still holds the camera**: the shared memory name still
+  exists, so `scCreateCamera` fails until every app lets go, and apps that held the camera stay on a dark
+  placeholder. This happens after a bridge restart or Reload while Premier (or Chrome, Slack, …) has a Golf Cam
+  open. The modified softcam takes over the
+  leftover memory when no other sender is alive (guarded by a sender-only named object), and apps that held the
+  camera reconnect by themselves.
 - If the Spinnaker DirectShow filter ("PtGrey Camera") is registered, it grabs camera #0. Unregister it (see below).
 
 ## Status
@@ -58,6 +64,9 @@ Open PowerShell in this folder. If scripts are blocked, first run `Set-Execution
 .\register-cams.ps1      # registers both virtual cameras (asks for admin / UAC)
 .\build-app.ps1          # -> app\GolfCamBridge.exe
 ```
+
+To work on the app in Visual Studio, open `GolfCamBridge.slnx` (C# app only — the softcam DLLs are always built by
+`build-softcam.ps1`). F5 builds into `app\` just like `build-app.ps1`.
 
 > Registration stores the full DLL path, so do not move the `bin` folder afterwards. To move it:
 > `.\register-cams.ps1 -Uninstall`, move, register again.
@@ -88,7 +97,7 @@ Per camera:
 | `GainDb` | 24 | Gain in dB |
 | `PixelFormat` | `BayerRG8` | Falls back to any Bayer*8, then Mono8 |
 | `ReverseX` / `ReverseY` | false | Only for a camera mounted upside down |
-| `Width` / `Height` | 1280 / 720 | Centered ROI **and** the virtual camera's size. Required, multiples of 4 |
+| `Width` / `Height` | 1440 / 1080 | Centered ROI **and** the virtual camera's size. Required, multiples of 4. Default = full sensor of the BFS-U3-16S2C; use 1280 / 720 to run two cameras at 223 fps on one USB controller |
 
 Global:
 
@@ -152,6 +161,21 @@ Settings are grouped by what it takes to apply them:
 - `app\GolfCamBridge.exe --console` starts the tray app plus a live log window. Stop it with Ctrl+C (closing the window skips the clean shutdown).
 - Log file: `%LOCALAPPDATA%\GolfCamBridge\bridge.log`
 - `GolfCamBridge.exe --selftest` runs the settings-window logic checks (no camera needed, exit code 0 = OK).
+
+### Virtual camera test tool (no camera needed)
+
+`tools\reopen.cpp` opens a Golf Cam the way a capture app does, closes it and opens it again in one process —
+like Premier leaving practice mode and coming back. The bridge must be running; without a physical camera it
+checks against the standby image.
+
+```powershell
+.\tools\build-tools.ps1                    # -> build\tools\reopen.exe
+.\build\tools\reopen.exe "Golf Cam 1"      # reopen patterns A-D, exit code 0 = all OK
+.\build\tools\reopen.exe --restart "Golf Cam 1"   # exit + restart the bridge when told; held cameras must reconnect
+```
+
+A session only passes with live frames (mean pixel above 20). With a real camera in a dark room, set
+`$env:REOPEN_MIN_MEAN = 0`.
 
 ## Troubleshooting
 
